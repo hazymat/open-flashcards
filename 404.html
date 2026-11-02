@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Flashcards is now Quizaroo</title>
+<style>body { font: 18px/1.5 system-ui, sans-serif; margin: 15vh auto; max-width: 32em; padding: 0 16px; text-align: center; color: #e2e8f0; background: #0f172a; } a { color: #8fd3ff; } button { font: inherit; padding: .5em 1em; }</style>
+</head>
+<body>
+<p>Open Flashcards is now Quizaroo, redirecting…</p>
+<p id="big" hidden>You have too much saved to bring across automatically. Download your sets, open Quizaroo, then import the file in Your Library.<br><button id="save" type="button">Download my sets</button></p>
+<p><a id="go" href="https://quizaroo.github.io/">Go to Quizaroo</a></p>
+<noscript><meta http-equiv="refresh" content="0; url=https://quizaroo.github.io/"></noscript>
+<script>
+// This address is shared with other apps (Sift), so only ever touch what belongs to this app: open-flashcards:* keys, open-flashcards-* caches.
+var NEW_URL = 'https://quizaroo.github.io/', MAX_HASH = 1500000; // Chrome refuses addresses over 2 MB
+function old_values() {
+  var values = {};
+  try { for (var i = 0; i < localStorage.length; i++) { var key = localStorage.key(i); if (key.indexOf('open-flashcards:') === 0) values[key] = localStorage.getItem(key); } } catch (storage_err) {}
+  return values;
+}
+function to_base64url(text) {
+  var bytes = new TextEncoder().encode(text), binary_text = '';
+  for (var i = 0; i < bytes.length; i += 8192) binary_text += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return btoa(binary_text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function clean_up() {
+  var jobs = [];
+  if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistration().then(function (registration) { return registration && registration.scope.indexOf('/open-flashcards/') > 0 && registration.unregister(); }));
+  if ('caches' in window) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.filter(function (key) { return key.indexOf('open-flashcards-') === 0; }).map(function (key) { return caches.delete(key); })); }));
+  return Promise.race([Promise.all(jobs), new Promise(function (done) { setTimeout(done, 1000); })]).catch(function () {});
+}
+var values = old_values(), encoded = Object.keys(values).length ? to_base64url(JSON.stringify(values)) : '';
+if (encoded.length > MAX_HASH) {
+  document.getElementById('big').hidden = false;
+  document.getElementById('save').onclick = function () {
+    var sets = []; try { sets = JSON.parse(values['open-flashcards:v1']).sets; } catch (parse_err) {}
+    var link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([JSON.stringify({format: 'open-flashcards', version: 1, sets: sets})], {type: 'application/json'})); link.download = 'quizaroo-all.json'; link.click();
+  };
+  clean_up();
+} else {
+  var target = NEW_URL + (encoded ? '#handover=' + encoded : '');
+  document.getElementById('go').href = target;
+  clean_up().then(function () { location.replace(target); });
+}
+</script>
+</body>
+</html>
